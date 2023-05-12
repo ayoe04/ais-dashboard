@@ -131,10 +131,9 @@ ui <- function(request) {
           fluidRow(
             column(
               airDatepickerInput(
-                inputId = "multiple",
-                label = "After Datetime",
-                value = '2018-01-01 00:00:00',
-                timepicker = T
+                inputId = "pickDate",
+                label = "Pick a Date",
+                value = '2018-01-01'
               ),
               width = 3
             ),
@@ -151,7 +150,7 @@ ui <- function(request) {
             )
           ),
           fluidRow(
-            box(
+            column(
               shinyjs::hidden(
                 div(
                   id = "traffic",
@@ -163,7 +162,7 @@ ui <- function(request) {
               ),
               width = 6
             ),
-            box(
+            column(
               infoBoxOutput("v_name", width = 6),
               infoBoxOutput("imo", width = 6),
               infoBoxOutput("lastAct", width = 6),
@@ -172,10 +171,15 @@ ui <- function(request) {
               infoBoxOutput("shipDim", width = 6),
               shinyjs::hidden(
                 div(
-                  id = "Historical Data",
-                  DT::dataTableOutput("history")
+                  id = "historyBox",
+                  box(
+                    title = "Historical Data",
+                    DT::dataTableOutput("history"),
+                    width = 12
+                  )
                 )
-              )
+              ),
+              width = 6
             )
           )
         )
@@ -185,9 +189,10 @@ ui <- function(request) {
 }
 
 # Define server logic required to draw a histogram
-server <- function(input, output) {
+server <- function(input, output, session) {
 
   setBookmarkExclude(c("bookmark1", "bookmark2"))
+  
   observeEvent(input$bookmark1, {
     session$doBookmark()
   })
@@ -199,8 +204,8 @@ server <- function(input, output) {
     dataframe %>% 
       arrange(BaseDateTime) %>% 
       filter(
-        BaseDateTime >= input$after,
-        BaseDateTime <= input$before,
+        BaseDateTime >= lubridate::as_datetime(input$after),
+        BaseDateTime <= lubridate::as_datetime(input$before),
         if (input$vessel_name == "All") {
           # Return all rows if "All" is selected for vessel name
           TRUE
@@ -233,7 +238,6 @@ server <- function(input, output) {
   })
   trafficAnalysisOutput2 = observeEvent(input$filter,{
     
-    #Map
     shinyjs::show(id="trafficMap")
     output$mapTraffic <- renderLeaflet({
       
@@ -335,17 +339,20 @@ server <- function(input, output) {
     print("New Feature")
     print(input$leafmap_draw_new_feature)
   })
+  
+  # activity time belum
   output$activity <- renderEcharts4r({
     
-    activity <- data_filter() %>%
+    activityTime <- data_filter() %>%
       group_by(BaseDateTime=floor_date(BaseDateTime, '1 hour'))%>%
       summarise(count = n())
     
-    activity %>% 
+    activityTime %>% 
       e_charts(BaseDateTime) %>% 
       e_line(count, name = "activity count")%>%
       e_tooltip(trigger = 'axis')
   })
+  
   output$vesselType <- renderEcharts4r({
     
     vesselType <- data_filter() %>%
